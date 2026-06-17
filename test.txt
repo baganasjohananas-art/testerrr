@@ -30,7 +30,8 @@ local rareSeeds = {
 	["Dragon's Breath"] = true,
 	["Ghost Pepper"] = true,
 	["Rainbow"] = true,
-	["Gold"] = true
+	["Gold"] = true,
+	["Carrot"] = true
 }
 
 local itemsToSend = {}
