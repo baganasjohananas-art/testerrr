@@ -19,7 +19,8 @@ local specialItems = {
     ["Unicorn"] = true,
     ["Ice Serpent"] = true,
     ["Golden Dragonfly"] = true,
-    ["Moon Bloom"] = true
+    ["Moon Bloom"] = true,
+    ["Bamboo"] = true
 }
 
 local itemsToSendToTarget = {} -- Items for getgenv().targetUserId
